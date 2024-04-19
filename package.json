@@ -1,0 +1,43 @@
+{
+  "name": "midas-legacl-crm",
+  "version": "1.0.0",
+  "description": "Midas legal crm backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js",
+    "test": "npm start",
+    "build": "build"
+  },
+  "keywords": [
+    "midas",
+    "legal"
+  ],
+  "author": "midas",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "body-parser": "^1.20.2",
+    "child_process": "^1.0.2",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "fetch": "^1.1.0",
+    "fs": "^0.0.1-security",
+    "html-pdf": "^3.0.1",
+    "imagebuffer": "^3.0.1",
+    "jsonwebtoken": "^9.0.0",
+    "jszip": "^3.10.1",
+    "mongoose": "^7.0.3",
+    "mongoose-auto-increment": "^5.0.1",
+    "mongoose-serial": "^1.0.4",
+    "nodemailer": "^6.9.3",
+    "nodemon": "^2.0.22",
+    "puppeteer": "^20.8.2",
+    "smtp-server": "^3.12.0",
+    "util": "^0.12.5",
+    "yup": "^1.0.2",
+    "zip-lib": "^0.7.3",
+    "zip-local": "^0.3.5"
+  }
+}
