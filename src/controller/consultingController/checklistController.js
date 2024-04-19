@@ -2,19 +2,86 @@ const CheckList = require("../../model/SubmitChecklist");
 const ListJson = require("../../utils/Checklists.json");
 const nodemailer = require("nodemailer");
 const pdf = require("html-pdf");
+const http = require("https");
 const { default: puppeteer } = require("puppeteer");
 const checklistJson = require("../../model/Cretechecklist");
 
+function makeUserEmail(value) {
+  let userEmail = value;
+
+  return {
+    get: function () {
+      return userEmail;
+    },
+    set: function (newValue) {
+      userEmail = newValue;
+    },
+  };
+}
+const wrapper = makeUserEmail("blank");
 const GetCheckList = async (req, res) => {
   const { checklistitemname } = req.params;
+  const { id } = req.query;
 
   const findChecklist = await checklistJson.find({});
   var returnJson = findChecklist.filter(
     (item) => item.Listname == checklistitemname
   );
-  // var returnJson = checklistJson;
+  const getMailId = async (id) => {
+    try {
+      const options = {
+        method: "GET",
+        hostname: "hrmsapi.midastech.org",
+        port: 8443,
+        path: `/api/v1/user/getUserById/${id}`,
+        headers: {
+          "User-Agent": "insomnia/8.6.1",
+          "Content-Type": "application/json",
+        },
+      };
+
+      const responseData = await new Promise((resolve, reject) => {
+        const req = http.request(options, (res) => {
+          const chunks = [];
+
+          res.on("data", (chunk) => {
+            chunks.push(chunk);
+          });
+
+          res.on("end", () => {
+            const body = Buffer.concat(chunks);
+            resolve(body.toString());
+          });
+        });
+
+        req.on("error", (error) => {
+          reject(new Error(`Failed to make API request: ${error.message}`));
+        });
+
+        req.end();
+      });
+
+      const jsonResponse = JSON.parse(responseData);
+      const { email } = jsonResponse.payload;
+      return email;
+      console.log("jsonResponse", responseData);
+    } catch (error) {
+      throw new Error(`Error in getMailId: ${error.message}`);
+    }
+  };
 
   if (returnJson.length !== 0) {
+    const userId = id;
+    getMailId(userId)
+      .then((data) => {
+        console.log("API response data:", data);
+        // userEmail = data;
+        wrapper.set(data.trim());
+      })
+      .catch((error) => {
+        console.error("Error:", error.message);
+      });
+
     res.status(200).json({
       baseResponse: {
         status: 1,
@@ -79,7 +146,8 @@ const DeleteList = async (req, res) => {
   }
 };
 
-const SubmitCheckList = async (req, res) => {
+const SubmitCheckList = async (req, res, userEmail) => {
+  console.log("req", req);
   const {
     firstname,
     lastname,
@@ -128,13 +196,9 @@ const SubmitCheckList = async (req, res) => {
 
     await page.setContent(htmlData, { waitUntil: "networkidle0" });
 
-    // Generate PDF from the HTML content
-
     await page.pdf({ path: "output.pdf", format: "A3", printBackground: true });
 
     await browser.close();
-
-    // Return the path to the generated PDF file
 
     return "output.pdf";
   }
@@ -148,30 +212,17 @@ const SubmitCheckList = async (req, res) => {
       secure: false, // Use SSL/TLS
       auth: {
         user: "skill-checklist@midasconsulting.org", // Your email address
-        pass: "Beefly@2023", // Your password
+        pass: "Anubhav_123", // Your password
       },
       // auth: {
-      //   user: "mayank.kumar@midastravel.org", // Your email address
-      //   pass: "Mannuk12", // Your password
+      //   user: "mayank.kumar@midasconsulting.org", // Your email address
+      //   pass: "Developer@mannu", // Your password
       // },
     });
 
-    var mailOptions = {
-      from: "skill-checklist@midasconsulting.org",
-      to: "skill-checklist@midasconsulting.org",
-      subject: `Response Received- ${listName} Skills Checklist`,
-      attachments: [
-        {
-          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
-          path: pdfPath,
-          contentType: "application/pdf",
-        },
-      ],
-    };
-
     // var mailOptions = {
-    //   from: "mayank.kumar@midastravel.org",
-    //   to: "mayank.kumar@midastravel.org",
+    //   from: "skill-checklist@midasconsulting.org",
+    //   to: "skill-checklist@midasconsulting.org",
     //   subject: `Response Received- ${listName} Skills Checklist`,
     //   attachments: [
     //     {
@@ -181,6 +232,19 @@ const SubmitCheckList = async (req, res) => {
     //     },
     //   ],
     // };
+
+    var mailOptions = {
+      from: "skill-checklist@midasconsulting.org",
+      to: `${wrapper.get()}, skill-checklist@midasconsulting.org`,
+      subject: `Response Received- ${listName} Skills Checklist`,
+      attachments: [
+        {
+          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+          path: pdfPath,
+          contentType: "application/pdf",
+        },
+      ],
+    };
     transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
         res.status(404).json({
@@ -203,7 +267,6 @@ const SubmitCheckList = async (req, res) => {
       }
     });
   }
-
   // Main function to create PDF and send email
 
   async function createPDFAndSendEmail() {
