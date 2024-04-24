@@ -19,10 +19,58 @@ function makeUserEmail(value) {
   };
 }
 const wrapper = makeUserEmail("blank");
+
+const makeRTR = (initialValue) => {
+  var rtrValue = initialValue;
+
+  return {
+    get: () => {
+      return rtrValue;
+    },
+    set: (newValue) => {
+      rtrValue = newValue;
+    },
+  };
+};
+
+let wrapperRtr = makeRTR("blank");
+
 const GetCheckList = async (req, res) => {
   const { checklistitemname } = req.params;
-  const { id } = req.query;
 
+  const findChecklist = await checklistJson.find({});
+  var returnJson = findChecklist.filter(
+    (item) => item.Listname == checklistitemname
+  );
+  // var returnJson = checklistJson;
+
+  if (returnJson.length !== 0) {
+    res.status(200).json({
+      baseResponse: {
+        status: 1,
+        message: "Json Found Successfully",
+      },
+      response: returnJson[0],
+    });
+  } else {
+    res.status(404).json({
+      baseResponse: {
+        status: 0,
+        message: "No Json Found with the given name",
+      },
+      response: [],
+    });
+  }
+};
+
+const GetCheckListtwo = async (req, res) => {
+  const { checklistitemname } = req.params;
+  const { id } = req.query;
+  // console.log(r);
+  const r = req.query.r || "";
+  wrapperRtr.set(r);
+
+  // console.log("id", id);
   const findChecklist = await checklistJson.find({});
   var returnJson = findChecklist.filter(
     (item) => item.Listname == checklistitemname
@@ -146,8 +194,7 @@ const DeleteList = async (req, res) => {
   }
 };
 
-const SubmitCheckList = async (req, res, userEmail) => {
-  console.log("req", req);
+const SubmitCheckList = async (req, res) => {
   const {
     firstname,
     lastname,
@@ -196,9 +243,13 @@ const SubmitCheckList = async (req, res, userEmail) => {
 
     await page.setContent(htmlData, { waitUntil: "networkidle0" });
 
+    // Generate PDF from the HTML content
+
     await page.pdf({ path: "output.pdf", format: "A3", printBackground: true });
 
     await browser.close();
+
+    // Return the path to the generated PDF file
 
     return "output.pdf";
   }
@@ -206,6 +257,134 @@ const SubmitCheckList = async (req, res, userEmail) => {
   // Function to send the email with the PDF attachment
 
   async function sendEmail(pdfPath) {
+    var transporter = nodemailer.createTransport({
+      host: "smtp.office365.com",
+      port: 587,
+      secure: false, // Use SSL/TLS
+      auth: {
+        user: "skill-checklist@midasconsulting.org", // Your email address
+        pass: "Anubhav_123", // Your password
+      },
+    });
+
+    var mailOptions = {
+      from: "skill-checklist@midasconsulting.org",
+      to: "skill-checklist@midasconsulting.org",
+      subject: `Response Received- ${listName} Skills Checklist`,
+      attachments: [
+        {
+          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+          path: pdfPath,
+          contentType: "application/pdf",
+        },
+      ],
+    };
+
+    transporter.sendMail(mailOptions, async (error, info) => {
+      if (error) {
+        res.status(404).json({
+          baseResponse: {
+            status: 0,
+            message: error.message,
+          },
+          response: [],
+        });
+      } else {
+        await newCheckList.save();
+        res.status(200).json({
+          baseResponse: {
+            status: 1,
+            message: "Checklist submitted successfully",
+          },
+          response: newCheckList,
+        });
+        console.log("Email sent: " + info.response);
+      }
+    });
+  }
+
+  // Main function to create PDF and send email
+
+  async function createPDFAndSendEmail() {
+    try {
+      const pdfPath = await createPDF();
+
+      await sendEmail(pdfPath);
+    } catch (error) {
+      console.log("An error occurred:", error);
+    }
+  }
+
+  // Call the main function
+
+  createPDFAndSendEmail();
+};
+
+const SubmitCheckListtwo = async (req, res, userEmail) => {
+  console.log("req", req);
+  const {
+    firstname,
+    lastname,
+    phoneno,
+    email,
+    dob,
+    ssn,
+    references,
+    list,
+    htmlData,
+    htmlData1,
+    listName,
+    requestTimeOffDate,
+    categoryname,
+    address,
+  } = req.body;
+  if (!email && firstname && lastname && ssn && dob && phoneno) {
+    res.status(400).json({
+      baseResponse: {
+        status: 0,
+        message: "Please check your request",
+      },
+      response: [],
+    });
+  }
+  const newCheckList = new CheckList({
+    firstname,
+    lastname,
+    phoneno,
+    email,
+    dob,
+    ssn,
+    references,
+    list,
+    requestTimeOffDate,
+    categoryname,
+    address,
+  });
+
+  async function createPDF(htmlData, filename, format) {
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(htmlData, { waitUntil: "networkidle0" });
+
+    const pdfPath = `${filename}.pdf`; // Use a unique filename based on 'filename'
+    await page.pdf({ path: pdfPath, format: format, printBackground: true });
+
+    await browser.close();
+
+    return pdfPath;
+  }
+
+  // Function to send the email with the PDF attachment
+
+  async function sendEmail(pdfPath, rtrPdf) {
+    console.log("rtrpdfff", rtrPdf);
+    console.log("pdfPath", pdfPath);
+    var attachments = [];
     var transporter = nodemailer.createTransport({
       host: "smtp.office365.com",
       port: 587,
@@ -232,18 +411,49 @@ const SubmitCheckList = async (req, res, userEmail) => {
     //     },
     //   ],
     // };
+    rtrPdf === null
+      ? attachments.push({
+          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+          path: pdfPath,
+          contentType: "application/pdf",
+        })
+      : pdfPath === null
+      ? attachments.push({
+          filename: `${firstname}-RTR.pdf`,
+          path: rtrPdf,
+          contentType: "application/pdf",
+        })
+      : attachments.push(
+          {
+            filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+            path: pdfPath,
+            contentType: "application/pdf",
+          },
+          {
+            filename: `${firstname}-RTR.pdf`,
+            path: rtrPdf,
+            contentType: "application/pdf",
+          }
+        );
 
+    console.log("attachments", attachments);
     var mailOptions = {
       from: "skill-checklist@midasconsulting.org",
       to: `${wrapper.get()}, skill-checklist@midasconsulting.org`,
       subject: `Response Received- ${listName} Skills Checklist`,
-      attachments: [
-        {
-          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
-          path: pdfPath,
-          contentType: "application/pdf",
-        },
-      ],
+      attachments: attachments,
+      // [
+      //   {
+      //     filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+      //     path: pdfPath,
+      //     contentType: "application/pdf",
+      //   },
+      //   {
+      //     filename: `${firstname}-RTR.pdf`,
+      //     path: rtrPdf,
+      //     contentType: "application/pdf",
+      //   },
+      // ],
     };
     transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
@@ -271,9 +481,24 @@ const SubmitCheckList = async (req, res, userEmail) => {
 
   async function createPDFAndSendEmail() {
     try {
-      const pdfPath = await createPDF();
+      const pdfPath = await createPDF(htmlData, "pdf1", "A3");
+      let rtrPdf = null;
 
-      await sendEmail(pdfPath);
+      if (wrapperRtr.get() === "ortr") {
+        // Create rtrPdf only if wrapperRtr.get() is "ortr"
+        rtrPdf = await createPDF(htmlData1, "pdf2", "A3");
+        await sendEmail(null, rtrPdf); // Send only rtrPdf
+      } else if (wrapperRtr.get() === "wrtr") {
+        // Create rtrPdf if wrapperRtr.get() is "wrtr"
+        rtrPdf = await createPDF(htmlData1, "pdf2", "A3");
+        await sendEmail(pdfPath, rtrPdf); // Send both pdfPath and rtrPdf
+      } else if (wrapperRtr.get() === "nortr") {
+        // Send only pdfPath if wrapperRtr.get() is "nortr"
+        await sendEmail(pdfPath, null);
+      } else {
+        // Handle other cases accordingly (if needed)
+        console.log("Invalid wrapperRtr.get() value");
+      }
     } catch (error) {
       console.log("An error occurred:", error);
     }
@@ -340,7 +565,9 @@ const getCreatedChecklist = async (req, res) => {
 module.exports = {
   createChecklist,
   GetCheckList,
+  GetCheckListtwo,
   SubmitCheckList,
+  SubmitCheckListtwo,
   GetFilledCheckList,
   DeleteList,
   getCreatedChecklist,
