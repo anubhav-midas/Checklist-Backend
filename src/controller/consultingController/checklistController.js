@@ -35,6 +35,21 @@ const makeRTR = (initialValue) => {
 
 let wrapperRtr = makeRTR("blank");
 
+const makeMail = (initialValue) => {
+  var mailValue = initialValue;
+
+  return {
+    get: () => {
+      return mailValue;
+    },
+    set: (newValue) => {
+      mailValue = newValue;
+    },
+  };
+};
+
+let wrapperRecruiter = makeMail("blank");
+
 const GetCheckList = async (req, res) => {
   const { checklistitemname } = req.params;
 
@@ -69,6 +84,9 @@ const GetCheckListtwo = async (req, res) => {
   // console.log(r);
   const r = req.query.r || "";
   wrapperRtr.set(r);
+
+  const recruiterMail = req.query.mail || "";
+  wrapperRecruiter.set(recruiterMail);
 
   // console.log("id", id);
   const findChecklist = await checklistJson.find({});
@@ -219,6 +237,10 @@ const SubmitCheckList = async (req, res) => {
       response: [],
     });
   }
+
+  const typeValue = "Checklist";
+  const sendermail = "manualy sent";
+
   const newCheckList = new CheckList({
     firstname,
     lastname,
@@ -227,6 +249,9 @@ const SubmitCheckList = async (req, res) => {
     dob,
     ssn,
     references,
+    listName,
+    type: typeValue,
+    sentby: sendermail,
     list,
     requestTimeOffDate,
     categoryname,
@@ -321,7 +346,6 @@ const SubmitCheckList = async (req, res) => {
 };
 
 const SubmitCheckListtwo = async (req, res, userEmail) => {
-  console.log("req", req);
   const {
     firstname,
     lastname,
@@ -331,9 +355,9 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
     ssn,
     references,
     list,
+    listName,
     htmlData,
     htmlData1,
-    listName,
     requestTimeOffDate,
     categoryname,
     address,
@@ -347,6 +371,16 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
       response: [],
     });
   }
+
+  const typeValue =
+    wrapperRtr.get() === "ortr"
+      ? "RTR"
+      : wrapperRtr.get() === "nortr"
+      ? "Checklist"
+      : "Both";
+
+  const sender = wrapperRecruiter.get();
+
   const newCheckList = new CheckList({
     firstname,
     lastname,
@@ -355,6 +389,9 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
     dob,
     ssn,
     references,
+    listName,
+    type: typeValue,
+    sentby: sender,
     list,
     requestTimeOffDate,
     categoryname,
