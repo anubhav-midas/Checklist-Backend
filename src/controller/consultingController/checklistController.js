@@ -5,6 +5,7 @@ const pdf = require("html-pdf");
 const http = require("https");
 const { default: puppeteer } = require("puppeteer");
 const checklistJson = require("../../model/Cretechecklist");
+const CryptoJS = require("crypto-js");
 
 function makeUserEmail(value) {
   let userEmail = value;
@@ -81,25 +82,42 @@ const GetCheckList = async (req, res) => {
 const GetCheckListtwo = async (req, res) => {
   const { checklistitemname } = req.params;
   const { id } = req.query;
-  // console.log(r);
+
+  const secretKey = "secretHello";
+
+  function decryptURL(encryptedURL, secretKey) {
+    const decodedURL = decodeURIComponent(encryptedURL);
+    const encryptedBase64 = atob(decodedURL); // Decode base64 using `atob` in Node.js
+    const bytes = CryptoJS.AES.decrypt(encryptedBase64, secretKey);
+    const decryptedURL = bytes.toString(CryptoJS.enc.Utf8);
+    return decryptedURL;
+  }
+
   const r = req.query.r || "";
   wrapperRtr.set(r);
 
-  const recruiterMail = req.query.mail || "";
+  // const recruiterMail = req.query.mail || "";
+  // wrapperRecruiter.set(recruiterMail);
+  const uId = decryptURL(id, secretKey);
+  console.log(uId);
+  const recruiterMail = decryptURL(req.query.mail, secretKey);
   wrapperRecruiter.set(recruiterMail);
+
+  console.log("uId", uId);
+  console.log("decryptedMail", recruiterMail);
 
   // console.log("id", id);
   const findChecklist = await checklistJson.find({});
   var returnJson = findChecklist.filter(
     (item) => item.Listname == checklistitemname
   );
-  const getMailId = async (id) => {
+  const getMailId = async (paramId) => {
     try {
       const options = {
         method: "GET",
         hostname: "hrmsapi.midastech.org",
         port: 8443,
-        path: `/api/v1/user/getUserById/${id}`,
+        path: `/api/v1/user/getUserById/${paramId}`,
         headers: {
           "User-Agent": "insomnia/8.6.1",
           "Content-Type": "application/json",
@@ -137,11 +155,12 @@ const GetCheckListtwo = async (req, res) => {
   };
 
   if (returnJson.length !== 0) {
-    const userId = id;
-    getMailId(userId)
+    // const userId = id;
+    getMailId(uId)
       .then((data) => {
         console.log("API response data:", data);
         // userEmail = data;
+        wrapper.set("");
         wrapper.set(data.trim());
       })
       .catch((error) => {
