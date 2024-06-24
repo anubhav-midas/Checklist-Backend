@@ -440,6 +440,7 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
   async function sendEmail(pdfPath, rtrPdf) {
     console.log("rtrpdfff", rtrPdf);
     console.log("pdfPath", pdfPath);
+    // const userEmail = wrapper.get();
     var attachments = [];
     var transporter = nodemailer.createTransport({
       host: "smtp.office365.com",
@@ -498,18 +499,6 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
       to: `${wrapper.get()}, skill-checklist@midasconsulting.org`,
       subject: `Response Received- ${listName} Skills Checklist`,
       attachments: attachments,
-      // [
-      //   {
-      //     filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
-      //     path: pdfPath,
-      //     contentType: "application/pdf",
-      //   },
-      //   {
-      //     filename: `${firstname}-RTR.pdf`,
-      //     path: rtrPdf,
-      //     contentType: "application/pdf",
-      //   },
-      // ],
     };
     transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
