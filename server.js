@@ -1,5 +1,6 @@
 const express = require("express");
 const PORT = process.env.PORT || 9000;
+const session = require("express-session");
 const app = express();
 const cors = require("cors");
 const blogs = require("./src/routes/BlogsRoute");
@@ -28,6 +29,15 @@ const corsOPt = {
   method: "*",
   allowedHeaders: ["*"],
 };
+
+app.use(
+  session({
+    secret: "sessionkey", // Change this to a long, random string
+    resave: false,
+    saveUninitialized: true,
+  })
+);
+
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 // app.use(parser.json({ limit: "100mb" }));

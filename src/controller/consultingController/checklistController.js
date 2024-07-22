@@ -6,6 +6,7 @@ const http = require("https");
 const { default: puppeteer } = require("puppeteer");
 const checklistJson = require("../../model/Cretechecklist");
 const CryptoJS = require("crypto-js");
+const { set } = require("../../model/fields");
 
 function makeUserEmail(value) {
   let userEmail = value;
@@ -19,6 +20,7 @@ function makeUserEmail(value) {
     },
   };
 }
+
 const wrapper = makeUserEmail("blank");
 
 const makeRTR = (initialValue) => {
@@ -87,7 +89,7 @@ const GetCheckListtwo = async (req, res) => {
 
   function decryptURL(encryptedURL, secretKey) {
     const decodedURL = decodeURIComponent(encryptedURL);
-    const encryptedBase64 = atob(decodedURL); // Decode base64 using `atob` in Node.js
+    const encryptedBase64 = atob(decodedURL);
     const bytes = CryptoJS.AES.decrypt(encryptedBase64, secretKey);
     const decryptedURL = bytes.toString(CryptoJS.enc.Utf8);
     return decryptedURL;
@@ -96,8 +98,6 @@ const GetCheckListtwo = async (req, res) => {
   const r = req.query.r || "";
   wrapperRtr.set(r);
 
-  // const recruiterMail = req.query.mail || "";
-  // wrapperRecruiter.set(recruiterMail);
   const uId = decryptURL(id, secretKey);
   console.log(uId);
   const recruiterMail = decryptURL(req.query.mail, secretKey);
@@ -106,73 +106,19 @@ const GetCheckListtwo = async (req, res) => {
   console.log("uId", uId);
   console.log("decryptedMail", recruiterMail);
 
-  // console.log("id", id);
   const findChecklist = await checklistJson.find({});
   var returnJson = findChecklist.filter(
     (item) => item.Listname == checklistitemname
   );
-  const getMailId = async (paramId) => {
-    try {
-      const options = {
-        method: "GET",
-        hostname: "hrmsapi.midastech.org",
-        port: 8443,
-        path: `/api/v1/user/getUserById/${paramId}`,
-        headers: {
-          "User-Agent": "insomnia/8.6.1",
-          "Content-Type": "application/json",
-        },
-      };
-
-      const responseData = await new Promise((resolve, reject) => {
-        const req = http.request(options, (res) => {
-          const chunks = [];
-
-          res.on("data", (chunk) => {
-            chunks.push(chunk);
-          });
-
-          res.on("end", () => {
-            const body = Buffer.concat(chunks);
-            resolve(body.toString());
-          });
-        });
-
-        req.on("error", (error) => {
-          reject(new Error(`Failed to make API request: ${error.message}`));
-        });
-
-        req.end();
-      });
-
-      const jsonResponse = JSON.parse(responseData);
-      const { email } = jsonResponse.payload;
-      return email;
-      console.log("jsonResponse", responseData);
-    } catch (error) {
-      throw new Error(`Error in getMailId: ${error.message}`);
-    }
-  };
 
   if (returnJson.length !== 0) {
-    // const userId = id;
-    getMailId(uId)
-      .then((data) => {
-        console.log("API response data:", data);
-        // userEmail = data;
-        wrapper.set("");
-        wrapper.set(data.trim());
-      })
-      .catch((error) => {
-        console.error("Error:", error.message);
-      });
-
     res.status(200).json({
       baseResponse: {
         status: 1,
         message: "Json Found Successfully",
       },
       response: returnJson[0],
+      recruiterMail: recruiterMail,
     });
   } else {
     res.status(404).json({
@@ -246,6 +192,7 @@ const SubmitCheckList = async (req, res) => {
     requestTimeOffDate,
     categoryname,
     address,
+    senderMail,
   } = req.body;
   if (!email && firstname && lastname && ssn && dob && phoneno) {
     res.status(400).json({
@@ -364,7 +311,7 @@ const SubmitCheckList = async (req, res) => {
   createPDFAndSendEmail();
 };
 
-const SubmitCheckListtwo = async (req, res, userEmail) => {
+const SubmitCheckListtwo = async (req, res) => {
   const {
     firstname,
     lastname,
@@ -380,6 +327,7 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
     requestTimeOffDate,
     categoryname,
     address,
+    senderMail,
   } = req.body;
   if (!email && firstname && lastname && ssn && dob && phoneno) {
     res.status(400).json({
@@ -496,7 +444,7 @@ const SubmitCheckListtwo = async (req, res, userEmail) => {
     console.log("attachments", attachments);
     var mailOptions = {
       from: "skill-checklist@midasconsulting.org",
-      to: `${wrapper.get()}, skill-checklist@midasconsulting.org`,
+      to: `${senderMail}, skill-checklist@midasconsulting.org`,
       subject: `Response Received- ${listName} Skills Checklist`,
       attachments: attachments,
     };
