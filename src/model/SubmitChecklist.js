@@ -9,9 +9,13 @@ const ChecklistSchema = new mongoose.Schema({
   dob: String,
   ssn: Number,
   references: Array,
+  listName: String,
+  type: String,
+  sentby: String,
   list: Array,
   requestTimeOffDate: Object,
   address: String,
+  senderMail: String,
 });
 
 const CheckList = new mongoose.model("CheckList", ChecklistSchema);

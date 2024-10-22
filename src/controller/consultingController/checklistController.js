@@ -2,8 +2,56 @@ const CheckList = require("../../model/SubmitChecklist");
 const ListJson = require("../../utils/Checklists.json");
 const nodemailer = require("nodemailer");
 const pdf = require("html-pdf");
+const http = require("https");
 const { default: puppeteer } = require("puppeteer");
 const checklistJson = require("../../model/Cretechecklist");
+const CryptoJS = require("crypto-js");
+const { set } = require("../../model/fields");
+
+function makeUserEmail(value) {
+  let userEmail = value;
+
+  return {
+    get: function () {
+      return userEmail;
+    },
+    set: function (newValue) {
+      userEmail = newValue;
+    },
+  };
+}
+
+const wrapper = makeUserEmail("blank");
+
+const makeRTR = (initialValue) => {
+  var rtrValue = initialValue;
+
+  return {
+    get: () => {
+      return rtrValue;
+    },
+    set: (newValue) => {
+      rtrValue = newValue;
+    },
+  };
+};
+
+let wrapperRtr = makeRTR("blank");
+
+const makeMail = (initialValue) => {
+  var mailValue = initialValue;
+
+  return {
+    get: () => {
+      return mailValue;
+    },
+    set: (newValue) => {
+      mailValue = newValue;
+    },
+  };
+};
+
+let wrapperRecruiter = makeMail("blank");
 
 const GetCheckList = async (req, res) => {
   const { checklistitemname } = req.params;
@@ -21,6 +69,56 @@ const GetCheckList = async (req, res) => {
         message: "Json Found Successfully",
       },
       response: returnJson[0],
+    });
+  } else {
+    res.status(404).json({
+      baseResponse: {
+        status: 0,
+        message: "No Json Found with the given name",
+      },
+      response: [],
+    });
+  }
+};
+
+const GetCheckListtwo = async (req, res) => {
+  const { checklistitemname } = req.params;
+  const { id } = req.query;
+
+  const secretKey = "secretHello";
+
+  function decryptURL(encryptedURL, secretKey) {
+    const decodedURL = decodeURIComponent(encryptedURL);
+    const encryptedBase64 = atob(decodedURL);
+    const bytes = CryptoJS.AES.decrypt(encryptedBase64, secretKey);
+    const decryptedURL = bytes.toString(CryptoJS.enc.Utf8);
+    return decryptedURL;
+  }
+
+  const r = req.query.r || "";
+  wrapperRtr.set(r);
+
+  const uId = decryptURL(id, secretKey);
+  console.log(uId);
+  const recruiterMail = decryptURL(req.query.mail, secretKey);
+  wrapperRecruiter.set(recruiterMail);
+
+  console.log("uId", uId);
+  console.log("decryptedMail", recruiterMail);
+
+  const findChecklist = await checklistJson.find({});
+  var returnJson = findChecklist.filter(
+    (item) => item.Listname == checklistitemname
+  );
+
+  if (returnJson.length !== 0) {
+    res.status(200).json({
+      baseResponse: {
+        status: 1,
+        message: "Json Found Successfully",
+      },
+      response: returnJson[0],
+      recruiterMail: recruiterMail,
     });
   } else {
     res.status(404).json({
@@ -94,6 +192,7 @@ const SubmitCheckList = async (req, res) => {
     requestTimeOffDate,
     categoryname,
     address,
+    senderMail,
   } = req.body;
   if (!email && firstname && lastname && ssn && dob && phoneno) {
     res.status(400).json({
@@ -104,6 +203,10 @@ const SubmitCheckList = async (req, res) => {
       response: [],
     });
   }
+
+  const typeValue = "Checklist";
+  const sendermail = "manualy sent";
+
   const newCheckList = new CheckList({
     firstname,
     lastname,
@@ -112,6 +215,9 @@ const SubmitCheckList = async (req, res) => {
     dob,
     ssn,
     references,
+    listName,
+    type: typeValue,
+    sentby: sendermail,
     list,
     requestTimeOffDate,
     categoryname,
@@ -148,12 +254,8 @@ const SubmitCheckList = async (req, res) => {
       secure: false, // Use SSL/TLS
       auth: {
         user: "skill-checklist@midasconsulting.org", // Your email address
-        pass: "Beefly@2023", // Your password
+        pass: "Anubhav_123", // Your password
       },
-      // auth: {
-      //   user: "mayank.kumar@midastravel.org", // Your email address
-      //   pass: "Mannuk12", // Your password
-      // },
     });
 
     var mailOptions = {
@@ -169,18 +271,6 @@ const SubmitCheckList = async (req, res) => {
       ],
     };
 
-    // var mailOptions = {
-    //   from: "mayank.kumar@midastravel.org",
-    //   to: "mayank.kumar@midastravel.org",
-    //   subject: `Response Received- ${listName} Skills Checklist`,
-    //   attachments: [
-    //     {
-    //       filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
-    //       path: pdfPath,
-    //       contentType: "application/pdf",
-    //     },
-    //   ],
-    // };
     transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
         res.status(404).json({
@@ -211,6 +301,197 @@ const SubmitCheckList = async (req, res) => {
       const pdfPath = await createPDF();
 
       await sendEmail(pdfPath);
+    } catch (error) {
+      console.log("An error occurred:", error);
+    }
+  }
+
+  // Call the main function
+
+  createPDFAndSendEmail();
+};
+
+const SubmitCheckListtwo = async (req, res) => {
+  const {
+    firstname,
+    lastname,
+    phoneno,
+    email,
+    dob,
+    ssn,
+    references,
+    list,
+    listName,
+    htmlData,
+    htmlData1,
+    requestTimeOffDate,
+    categoryname,
+    address,
+    senderMail,
+  } = req.body;
+  if (!email && firstname && lastname && ssn && dob && phoneno) {
+    res.status(400).json({
+      baseResponse: {
+        status: 0,
+        message: "Please check your request",
+      },
+      response: [],
+    });
+  }
+
+  const typeValue =
+    wrapperRtr.get() === "ortr"
+      ? "RTR"
+      : wrapperRtr.get() === "nortr"
+      ? "Checklist"
+      : "Both";
+
+  const sender = wrapperRecruiter.get();
+
+  const newCheckList = new CheckList({
+    firstname,
+    lastname,
+    phoneno,
+    email,
+    dob,
+    ssn,
+    references,
+    listName,
+    type: typeValue,
+    sentby: sender,
+    list,
+    requestTimeOffDate,
+    categoryname,
+    address,
+  });
+
+  async function createPDF(htmlData, filename, format) {
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(htmlData, { waitUntil: "networkidle0" });
+
+    const pdfPath = `${filename}.pdf`; // Use a unique filename based on 'filename'
+    await page.pdf({ path: pdfPath, format: format, printBackground: true });
+
+    await browser.close();
+
+    return pdfPath;
+  }
+
+  // Function to send the email with the PDF attachment
+
+  async function sendEmail(pdfPath, rtrPdf) {
+    console.log("rtrpdfff", rtrPdf);
+    console.log("pdfPath", pdfPath);
+    // const userEmail = wrapper.get();
+    var attachments = [];
+    var transporter = nodemailer.createTransport({
+      host: "smtp.office365.com",
+      port: 587,
+      secure: false, // Use SSL/TLS
+      auth: {
+        user: "skill-checklist@midasconsulting.org", // Your email address
+        pass: "Anubhav_123", // Your password
+      },
+      // auth: {
+      //   user: "mayank.kumar@midasconsulting.org", // Your email address
+      //   pass: "Developer@mannu", // Your password
+      // },
+    });
+
+    // var mailOptions = {
+    //   from: "skill-checklist@midasconsulting.org",
+    //   to: "skill-checklist@midasconsulting.org",
+    //   subject: `Response Received- ${listName} Skills Checklist`,
+    //   attachments: [
+    //     {
+    //       filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+    //       path: pdfPath,
+    //       contentType: "application/pdf",
+    //     },
+    //   ],
+    // };
+    rtrPdf === null
+      ? attachments.push({
+          filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+          path: pdfPath,
+          contentType: "application/pdf",
+        })
+      : pdfPath === null
+      ? attachments.push({
+          filename: `${firstname}-RTR.pdf`,
+          path: rtrPdf,
+          contentType: "application/pdf",
+        })
+      : attachments.push(
+          {
+            filename: `${firstname + "-" + lastname + "-" + listName}.pdf`,
+            path: pdfPath,
+            contentType: "application/pdf",
+          },
+          {
+            filename: `${firstname}-RTR.pdf`,
+            path: rtrPdf,
+            contentType: "application/pdf",
+          }
+        );
+
+    console.log("attachments", attachments);
+    var mailOptions = {
+      from: "skill-checklist@midasconsulting.org",
+      to: `${senderMail}, skill-checklist@midasconsulting.org`,
+      subject: `Response Received- ${listName} Skills Checklist`,
+      attachments: attachments,
+    };
+    transporter.sendMail(mailOptions, async (error, info) => {
+      if (error) {
+        res.status(404).json({
+          baseResponse: {
+            status: 0,
+            message: error.message,
+          },
+          response: [],
+        });
+      } else {
+        await newCheckList.save();
+        res.status(200).json({
+          baseResponse: {
+            status: 1,
+            message: "Checklist submitted successfully",
+          },
+          response: newCheckList,
+        });
+        console.log("Email sent: " + info.response);
+      }
+    });
+  }
+  // Main function to create PDF and send email
+
+  async function createPDFAndSendEmail() {
+    try {
+      const pdfPath = await createPDF(htmlData, "pdf1", "A3");
+      let rtrPdf = null;
+
+      if (wrapperRtr.get() === "ortr") {
+        // Create rtrPdf only if wrapperRtr.get() is "ortr"
+        rtrPdf = await createPDF(htmlData1, "pdf2", "A3");
+        await sendEmail(null, rtrPdf); // Send only rtrPdf
+      } else if (wrapperRtr.get() === "wrtr") {
+        // Create rtrPdf if wrapperRtr.get() is "wrtr"
+        rtrPdf = await createPDF(htmlData1, "pdf2", "A3");
+        await sendEmail(pdfPath, rtrPdf); // Send both pdfPath and rtrPdf
+      } else if (wrapperRtr.get() === "nortr") {
+        // Send only pdfPath if wrapperRtr.get() is "nortr"
+        await sendEmail(pdfPath, null);
+      } else {
+        // Handle other cases accordingly (if needed)
+        console.log("Invalid wrapperRtr.get() value");
+      }
     } catch (error) {
       console.log("An error occurred:", error);
     }
@@ -277,7 +558,9 @@ const getCreatedChecklist = async (req, res) => {
 module.exports = {
   createChecklist,
   GetCheckList,
+  GetCheckListtwo,
   SubmitCheckList,
+  SubmitCheckListtwo,
   GetFilledCheckList,
   DeleteList,
   getCreatedChecklist,
